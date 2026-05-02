@@ -92,3 +92,56 @@ In Kubernetes, standard "Deployments" are for stateless apps (like our backend).
 Because of this architecture, we have achieved High Availability:
 1. **If a Backend Pod dies:** The Kubernetes `Deployment` instantly spins up a new one to maintain the desired replica count. Because the `Service` load balances, users barely notice a blip.
 2. **If a MongoDB Pod dies:** The data is safely stored on the Persistent Volume. The Replica Set immediately realizes the Primary node is gone, holds an election in milliseconds, and promotes a Secondary node to Primary. Our Node.js app automatically detects the new Primary and continues serving data without data loss.
+
+---
+
+# Video Demonstration Script
+
+This section provides a step-by-step script for recording the remaining 3 parts of your video presentation.
+
+## Part 2: Running System Demo
+**Goal:** Prove the system works properly and the Ingress is routing traffic.
+
+1. **Terminal Setup:** Make sure `minikube tunnel` is running in a separate background terminal window so the Ingress works.
+2. **What to do:**
+   - Type `kubectl get all` and hit enter.
+   - Run a command to create data:
+     ```bash
+     curl -s -X POST -H "Host: backend.local" -H "Content-Type: application/json" -d '{"title":"Demo Post", "content":"System is running perfectly"}' http://127.0.0.1/posts
+     ```
+   - Run a command to read data:
+     ```bash
+     curl -s -H "Host: backend.local" http://127.0.0.1/posts
+     ```
+3. **What to say:** *"Here is the running system demo. I will show the pods running by typing `kubectl get all`. Next, I will send an HTTP POST request to the Ingress on `backend.local` to create a post. Finally, I will send a GET request, which successfully reads the data out of our MongoDB database, proving the connection works."*
+
+## Part 3: Auto-scaling in Action
+**Goal:** Prove the Horizontal Pod Autoscaler (HPA) works under heavy load.
+
+1. **Terminal Setup:** Open two terminal windows side-by-side.
+2. **What to do:**
+   - In the **Left Terminal**, watch the autoscaler:
+     ```bash
+     kubectl get hpa -w
+     ```
+   - In the **Right Terminal**, send artificial heavy traffic to spike the CPU:
+     ```bash
+     for i in {1..200}; do curl -s -H "Host: backend.local" http://127.0.0.1/stress & done
+     ```
+   - Wait about 30 to 60 seconds. You will see the `TARGETS` CPU% jump above 70% in the left terminal, and `REPLICAS` will scale up from 1 to 5.
+   - Once it scales, stop the stress command and run `kubectl get pods` to show 5 backend pods running.
+3. **What to say:** *"For the auto-scaling demo, I have an HPA watching the backend pods. In the left window, I am watching the HPA. In the right window, I am sending 200 concurrent requests to a `/stress` endpoint which artificially blocks the CPU. As you can see, the CPU spikes over 70%, and Kubernetes automatically provisions 4 more pods, bringing our total up to 5 max replicas."*
+
+## Part 4: Pod Deletion Test (Failover)
+**Goal:** Prove High Availability by deleting a backend pod and a database pod.
+
+1. **Terminal Setup:** Use a single terminal window.
+2. **What to do (Backend Failover):**
+   - Type: `kubectl delete pods -l app=backend` (This deletes ALL backend pods simultaneously).
+   - Immediately type: `kubectl get pods` (You will see new ones springing up instantly).
+   - Once they are running, send a GET request to show the API still responds: `curl -s -H "Host: backend.local" http://127.0.0.1/posts`
+3. **What to say:** *"First, I will test Backend High Availability by forcefully deleting all backend pods. Because they are managed by a Deployment, Kubernetes instantly replaces them. The API still retrieves our data correctly."*
+4. **What to do (Database Failover):**
+   - Type: `kubectl delete pod mongodb-0` (This deletes the primary database).
+   - Immediately send a GET request again: `curl -s -H "Host: backend.local" http://127.0.0.1/posts`
+5. **What to say:** *"Next, I will test Database failover by deleting `mongodb-0`. Because we are using a Replica Set with Persistent Volumes, the cluster instantly promotes `mongodb-1` or `mongodb-2` to be the new primary. As you can see by my request, the application handles the failover seamlessly and 0 data is lost."*
