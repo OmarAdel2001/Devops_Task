@@ -2,7 +2,39 @@
 
 This document provides a detailed explanation of every component built for the Scalable Backend project. You can use this as a script or study guide for your **Architecture Explanation** video deliverable.
 
+## Architecture Diagram
+
+```mermaid
+graph TD
+    Client[Internet / Client] -->|HTTP Request| Ingress[NGINX Ingress]
+    Ingress -->|Routes to| ServiceBackend[Backend Service ClusterIP]
+    
+    subgraph Kubernetes Cluster
+        ServiceBackend -->|Load Balances| Backend1[Backend Pod 1]
+        ServiceBackend -->|Load Balances| Backend2[Backend Pod N]
+        
+        Backend1 -.->|Monitored by| HPA[Horizontal Pod Autoscaler]
+        Backend2 -.->|Monitored by| HPA
+        HPA -.->|Scales 1 to 5| Deployment[Backend Deployment]
+        
+        Backend1 -->|Reads/Writes| MongoService[MongoDB Headless Service]
+        Backend2 -->|Reads/Writes| MongoService
+        
+        MongoService -->|Resolves to| Mongo0[MongoDB Pod 0 Primary]
+        MongoService -->|Resolves to| Mongo1[MongoDB Pod 1 Secondary]
+        MongoService -->|Resolves to| Mongo2[MongoDB Pod 2 Secondary]
+        
+        Mongo0 <-->|Replication| Mongo1
+        Mongo0 <-->|Replication| Mongo2
+        
+        Mongo0 --- PV0[(Persistent Volume)]
+        Mongo1 --- PV1[(Persistent Volume)]
+        Mongo2 --- PV2[(Persistent Volume)]
+    end
+```
+
 ---
+
 
 ## 1. The Backend API (`backend/index.js` & `backend/models/Post.js`)
 **What it is:** A Node.js application using the Express framework.
